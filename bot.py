@@ -46,6 +46,23 @@ async def approve(_, m : Message):
 
 @app.on_message(filters.private & filters.command("start"))
 async def start_command(_, m: Message):
+    try:
+        await app.get_chat_member(cfg.CHID, m.from_user.id)
+    except Exception as e:
+        try:
+            invite_link = await app.create_chat_invite_link(cfg.CHID)
+        except Exception as err:
+            await m.reply(f"**❌ Make Sure I Am Admin In Your Channel!**\n\n**Error:** `{err}`")
+            return 
+        key = InlineKeyboardMarkup(
+            [[
+                InlineKeyboardButton("🍿 Join Update Channel 🍿", url=invite_link.invite_link),
+                InlineKeyboardButton("🍀 Check Again 🍀", callback_data="chk")
+            ]]
+        ) 
+        await m.reply_text("**⚠️Access Denied!⚠️\n\nPlease Join My Update Channel To Use Me. If You Joined The Channel Then Click On Check Again Button To Confirm.**", reply_markup=key)
+        return 
+    
     add_user(m.from_user.id)
     bot_me = await app.get_me()
     
@@ -70,6 +87,37 @@ Top #1 on Telegram**
     await m.reply_photo(BOT_IMAGE, caption=caption, reply_markup=keyboard)
 
 #━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Callbacks ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@app.on_callback_query(filters.regex("chk"))
+async def chk(_, cb: CallbackQuery):
+    try:
+        await app.get_chat_member(cfg.CHID, cb.from_user.id)
+    except:
+        await cb.answer("🙅‍♂️ You are not joined my channel first join channel then check again. 🙅‍♂️", show_alert=True)
+        return 
+    
+    add_user(cb.from_user.id)
+    bot_me = await app.get_me()
+    
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🤖 Add to Group", url=f"https://t.me/{bot_me.username}?startgroup=true"),
+            InlineKeyboardButton("📢 Add to Channel", url=f"https://t.me/{bot_me.username}?startchannel=true")
+        ],
+        [
+            InlineKeyboardButton("⚡ Bulk Approve", callback_data="bulk_approve"),
+            InlineKeyboardButton("📖 Help Menu", callback_data="help_menu")
+        ]
+    ])
+    
+    caption = f"""**Best Channel Management Bot,
+Top #1 on Telegram**
+
+👋 Hey {cb.from_user.mention},
+➡ Accept New Join Requests
+➡ Accept Pending Join Requests"""
+    
+    await cb.message.edit_caption(caption=caption, reply_markup=keyboard)
 
 @app.on_callback_query(filters.regex("main_menu"))
 async def main_menu_cb(_, cb: CallbackQuery):
