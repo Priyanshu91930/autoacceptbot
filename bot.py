@@ -4,7 +4,7 @@ from pyrogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, 
 from pyrogram import filters, Client, errors, enums
 from pyrogram.errors import UserNotParticipant
 from pyrogram.errors.exceptions.flood_420 import FloodWait
-from database import add_user, add_group, all_users, all_groups, users, remove_user, save_session, get_session, delete_session, is_logged_in
+from database import add_user, add_group, add_channel, all_users, all_groups, all_channels, users, groups, channels, remove_user, save_session, get_session, delete_session, is_logged_in
 from configs import cfg
 import random, asyncio
 
@@ -29,7 +29,11 @@ async def approve(_, m : Message):
     op = m.chat
     kk = m.from_user
     try:
-        add_group(m.chat.id)
+        # Check if it's a channel or group and add to correct collection
+        if m.chat.type == enums.ChatType.CHANNEL:
+            add_channel(m.chat.id)
+        else:
+            add_group(m.chat.id)
         await app.approve_chat_join_request(op.id, kk.id)
         await app.send_message(kk.id, "**Hello {}!\nWelcome To {}**".format(m.from_user.mention, m.chat.title))
         add_user(kk.id)
@@ -646,20 +650,114 @@ async def id_command(_, m: Message):
 async def stats_command(_, m: Message):
     xx = all_users()
     x = all_groups()
-    tot = int(xx + x)
+    c = all_channels()
+    tot = int(xx + x + c)
     
     if m.from_user.id in cfg.SUDO:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📄 Send Log File", callback_data="send_log_file")]
+        ])
         await m.reply_text(text=f"""
 🍀 **Bot Statistics** 🍀
 
 🙋‍♂️ **Users:** `{xx}`
 👥 **Groups:** `{x}`
-🚧 **Total:** `{tot}`""")
+📢 **Channels:** `{c}`
+🚧 **Total:** `{tot}`""", reply_markup=keyboard)
     else:
         await m.reply_text(text=f"""
 🍀 **Bot Statistics** 🍀
 
 🚧 **Total Users & Groups:** `{tot}`""")
+
+@app.on_callback_query(filters.regex("send_log_file"))
+async def send_log_file_cb(_, cb: CallbackQuery):
+    user_id = cb.from_user.id
+    
+    # Check if user is admin
+    if user_id not in cfg.SUDO:
+        await cb.answer("❌ Only admins can access this!", show_alert=True)
+        return
+    
+    await cb.answer("📄 Generating log file...")
+    
+    try:
+        # Get all users, groups and channels from database
+        all_users_list = list(users.find({}))
+        all_groups_list = list(groups.find({}))
+        all_channels_list = list(channels.find({}))
+        
+        log_content = "═══════════════════════════════════\n"
+        log_content += "          BOT LOG FILE\n"
+        log_content += "═══════════════════════════════════\n\n"
+        
+        log_content += f"📊 Total Users: {len(all_users_list)}\n"
+        log_content += f"📊 Total Groups: {len(all_groups_list)}\n"
+        log_content += f"📊 Total Channels: {len(all_channels_list)}\n\n"
+        
+        log_content += "═══════════════════════════════════\n"
+        log_content += "              USERS\n"
+        log_content += "═══════════════════════════════════\n\n"
+        
+        for idx, usr in enumerate(all_users_list, 1):
+            user_id_db = usr.get("user_id", "Unknown")
+            try:
+                user_info = await app.get_users(int(user_id_db))
+                username = f"@{user_info.username}" if user_info.username else "No Username"
+                name = user_info.first_name or "Unknown"
+                log_content += f"{idx}. {name} | {username} | ID: {user_id_db}\n"
+            except:
+                log_content += f"{idx}. Unknown User | ID: {user_id_db}\n"
+        
+        log_content += "\n═══════════════════════════════════\n"
+        log_content += "             GROUPS\n"
+        log_content += "═══════════════════════════════════\n\n"
+        
+        for idx, grp in enumerate(all_groups_list, 1):
+            chat_id_db = grp.get("chat_id", "Unknown")
+            try:
+                chat_info = await app.get_chat(int(chat_id_db))
+                chat_title = chat_info.title or "Unknown"
+                chat_username = f"@{chat_info.username}" if chat_info.username else "No Username"
+                log_content += f"{idx}. {chat_title} | {chat_username} | ID: {chat_id_db}\n"
+            except:
+                log_content += f"{idx}. Unknown Group | ID: {chat_id_db}\n"
+        
+        log_content += "\n═══════════════════════════════════\n"
+        log_content += "            CHANNELS\n"
+        log_content += "═══════════════════════════════════\n\n"
+        
+        for idx, chnl in enumerate(all_channels_list, 1):
+            chat_id_db = chnl.get("chat_id", "Unknown")
+            try:
+                chat_info = await app.get_chat(int(chat_id_db))
+                chat_title = chat_info.title or "Unknown"
+                chat_username = f"@{chat_info.username}" if chat_info.username else "No Username"
+                log_content += f"{idx}. {chat_title} | {chat_username} | ID: {chat_id_db}\n"
+            except:
+                log_content += f"{idx}. Unknown Channel | ID: {chat_id_db}\n"
+        
+        log_content += "\n═══════════════════════════════════\n"
+        log_content += "          END OF LOG FILE\n"
+        log_content += "═══════════════════════════════════"
+        
+        # Save to file
+        import os
+        log_file_path = "bot_log.txt"
+        with open(log_file_path, "w", encoding="utf-8") as f:
+            f.write(log_content)
+        
+        # Send file
+        await cb.message.reply_document(
+            document=log_file_path,
+            caption="📄 **Bot Log File**\n\nContains all users, groups, and channels information."
+        )
+        
+        # Delete the file after sending
+        os.remove(log_file_path)
+        
+    except Exception as e:
+        await cb.message.reply(f"❌ Error generating log file: {e}")
 
 #━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ Approve All Command ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

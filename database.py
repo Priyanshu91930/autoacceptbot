@@ -7,6 +7,7 @@ client = MongoClient(cfg.MONGO_URI)
 
 users = client['main']['users']
 groups = client['main']['groups']
+channels = client['main']['channels']  # For storing channels separately
 sessions = client['main']['sessions']  # For storing user login sessions
 
 def already_db(user_id):
@@ -18,6 +19,12 @@ def already_db(user_id):
 def already_dbg(chat_id):
         group = groups.find_one({"chat_id" : str(chat_id)})
         if not group:
+            return False
+        return True
+
+def already_dbc(chat_id):
+        channel = channels.find_one({"chat_id" : str(chat_id)})
+        if not channel:
             return False
         return True
 
@@ -39,6 +46,12 @@ def add_group(chat_id):
         return
     return groups.insert_one({"chat_id": str(chat_id)})
 
+def add_channel(chat_id):
+    in_db = already_dbc(chat_id)
+    if in_db:
+        return
+    return channels.insert_one({"chat_id": str(chat_id)})
+
 def all_users():
     user = users.find({})
     usrs = len(list(user))
@@ -48,6 +61,11 @@ def all_groups():
     group = groups.find({})
     grps = len(list(group))
     return grps
+
+def all_channels():
+    channel = channels.find({})
+    chnls = len(list(channel))
+    return chnls
 
 # Session management functions
 def save_session(user_id, session_string, phone_number):
