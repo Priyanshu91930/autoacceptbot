@@ -48,11 +48,13 @@ async def approve(_, m : Message):
 async def start_command(_, m: Message):
     try:
         await app.get_chat_member(cfg.CHID, m.from_user.id)
-    except:
+    except Exception as e:
+        print(f"Error in get_chat_member: {e}")
         try:
-            invite_link = await app.create_chat_invite_link(int(cfg.CHID))
-        except:
-            await m.reply("**Make Sure I Am Admin In Your Channel**")
+            invite_link = await app.create_chat_invite_link(cfg.CHID)
+        except Exception as err:
+            print(f"Error in create_chat_invite_link: {err}")
+            await m.reply(f"**❌ Make Sure I Am Admin In Your Channel!**\n\n**Error:** `{err}`\n**Channel ID:** `{cfg.CHID}`")
             return 
         key = InlineKeyboardMarkup(
             [[
@@ -92,7 +94,8 @@ Top #1 on Telegram**
 async def chk(_, cb: CallbackQuery):
     try:
         await app.get_chat_member(cfg.CHID, cb.from_user.id)
-    except:
+    except Exception as e:
+        print(f"Error in chk get_chat_member: {e}")
         await cb.answer("🙅‍♂️ You are not joined my channel first join channel then check again. 🙅‍♂️", show_alert=True)
         return 
     
