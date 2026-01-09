@@ -1,6 +1,4 @@
-# Don't Remove Credit @VJ_Botz
-# Subscribe YouTube Channel For Amazing Bot @Tech_VJ
-# Ask Doubt on telegram @KingVJ01
+# Auto Approval Bot Database
 
 from pymongo import MongoClient
 from configs import cfg
@@ -9,6 +7,7 @@ client = MongoClient(cfg.MONGO_URI)
 
 users = client['main']['users']
 groups = client['main']['groups']
+sessions = client['main']['sessions']  # For storing user login sessions
 
 def already_db(user_id):
         user = users.find_one({"user_id" : str(user_id)})
@@ -49,3 +48,30 @@ def all_groups():
     group = groups.find({})
     grps = len(list(group))
     return grps
+
+# Session management functions
+def save_session(user_id, session_string, phone_number):
+    """Save user's Pyrogram session to database"""
+    sessions.update_one(
+        {"user_id": str(user_id)},
+        {"$set": {
+            "user_id": str(user_id),
+            "session_string": session_string,
+            "phone_number": phone_number
+        }},
+        upsert=True
+    )
+
+def get_session(user_id):
+    """Get user's saved session from database"""
+    session = sessions.find_one({"user_id": str(user_id)})
+    return session
+
+def delete_session(user_id):
+    """Delete user's session from database"""
+    return sessions.delete_one({"user_id": str(user_id)})
+
+def is_logged_in(user_id):
+    """Check if user has a saved session"""
+    session = sessions.find_one({"user_id": str(user_id)})
+    return session is not None
